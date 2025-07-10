@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vikas - Modern Task Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .task-card {
+            transition: all 0.3s ease;
+        }
+        .task-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+        .dragging {
+            opacity: 0.5;
+            transform: scale(0.98);
+        }
+        .dropzone-highlight {
+            background-color: rgba(124, 58, 237, 0.1);
+            border: 1px dashed rgba(124, 58, 237, 0.5);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 transition-colors duration-300">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <header class="flex justify-between items-center mb-8">
+            <div class="flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                <h1 class="text-3xl font-bold text-gray-800 dark:text-white ml-2">Vikas Sphere</h1>
+            </div>
+            <div>
+                <button id="theme-toggle" class="p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path id="theme-icon" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8 transition-colors duration-300">
+            <h2 class="text-xl font-semibold text-gray-800 dark:text-white mb-4">Add New Task</h2>
+            <div class="flex flex-col sm:flex-row gap-4">
+                <input type="text" id="task-input" placeholder="What needs to be done?" 
+                    class="flex-grow px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                <select id="priority-select" class="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                    <option value="low">Low Priority</option>
+                    <option value="medium" selected>Medium Priority</option>
+                    <option value="high">High Priority</option>
+                </select>
+                <button id="add-task-btn" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors">
+                    Add Task
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8 transition-colors duration-300">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold text-gray-800 dark:text-white">Your Tasks</h2>
+                <div class="flex gap-2">
+                    <select id="filter-select" class="px-3 py-1 text-sm rounded-lg border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                        <option value="all">All Tasks</option>
+                        <option value="low">Low Priority</option>
+                        <option value="medium">Medium Priority</option>
+                        <option value="high">High Priority</option>
+                        <option value="completed">Completed</option>
+                    </select>
+                    <select id="sort-select" class="px-3 py-1 text-sm rounded-lg border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                        <option value="added">Added Date</option>
+                        <option value="priority">Priority</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div id="tasks-container" class="space-y-3 min-h-[200px]">
+                <!-- Tasks will be added here dynamically -->
+                <div id="empty-state" class="text-center py-10 text-gray-500 dark:text-gray-400">
+                    <img src="https://placehold.co/600x400/ffffff/cccccc?text=No+Tasks+Yet" alt="Empty task list with clipboard illustration" class="mx-auto w-48 mb-4">
+                    <p class="text-lg">Your task list is empty!</p>
+                    <p class="text-sm">Add your first task above to get started</p>
+                </div>
+            </div>
+        </div>
+
+        <footer class="text-center text-gray-500 dark:text-gray-400 text-sm">
+            <p>Drag and drop to reorder tasks • Double-click to edit tasks</p>
+        </footer>
+    </div>
+
+    <script>
+        // Check for saved theme preference or use preferred color scheme
+        const storedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.classList.toggle('dark', storedTheme === 'dark');
+
+        // Theme toggle functionality
+        document.getElementById('theme-toggle').addEventListener('click', () => {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            updateThemeIcon();
+        });
+
+        function updateThemeIcon() {
+            const icon = document.getElementById('theme-icon');
+            const isDark = document.documentElement.classList.contains('dark');
+            icon.setAttribute('d', isDark 
+                ? 'M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z'
+                : 'M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z');
+        }
+        updateThemeIcon();
+
+        // Task management
+        let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+
+        function renderTasks(filter = 'all', sortBy = 'added') {
+            const container = document.getElementById('tasks-container');
+            container.innerHTML = '';
+
+            if (tasks.length === 0) {
+                container.appendChild(document.getElementById('empty-state').cloneNode(true));
+                return;
+            }
+
+            let filteredTasks = [...tasks];
+            
+            // Apply filter
+            if (filter !== 'all') {
+                if (filter === 'completed') {
+                    filteredTasks = filteredTasks.filter(task => task.completed);
+                } else {
+                    filteredTasks = filteredTasks.filter(task => task.priority === filter);
+                }
+            }
+            
+            // Apply sorting
+            if (sortBy === 'priority') {
+                const priorityOrder = {high: 3, medium: 2, low: 1};
+                filteredTasks.sort((a, b) => priorityOrder[b.priority] - priorityOrder[a.priority]);
+            } else {
+                filteredTasks.sort((a, b) => b.id - a.id); // Newest first by default
+            }
+
+            if (filteredTasks.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-10 text-gray-500 dark:text-gray-400">
+                        <img src="https://placehold.co/600x400/ffffff/cccccc?text=No+Matching+Tasks" alt="No tasks found with current filters" class="mx-auto w-48 mb-4">
+                        <p class="text-lg">No tasks match your current filter</p>
+                    </div>
+                `;
+                return;
+            }
+
+            filteredTasks.forEach((task, index) => {
+                const taskElement = document.createElement('div');
+                taskElement.className = `task-card bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600 cursor-move relative group ${task.completed ? 'opacity-70' : ''}`;
+                taskElement.draggable = true;
+                taskElement.dataset.id = task.id;
+
+                const priorityColors = {
+                    high: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200',
+                    medium: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200',
+                    low: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
+                };
+
+                taskElement.innerHTML = `
+                    <div class="flex items-start gap-3">
+                        <button class="complete-toggle mt-1 p-1 rounded-full ${task.completed ? 'bg-purple-600 text-white' : 'border border-gray-300 dark:border-gray-500'}">
+                            ${task.completed ? 
+                                '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>' : 
+                                ''}
+                        </button>
+                        <div class="flex-grow">
+                            <div class="flex justify-between items-start">
+                                <p class="${task.completed ? 'line-through text-gray-500 dark:text-gray-400' : 'text-gray-800 dark:text-white'}">${task.text}</p>
+                                <span class="priority-badge text-xs px-2 py-1 rounded-full ${priorityColors[task.priority]}">
+                                    ${task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                                </span>
+                            </div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Added ${new Date(task.createdAt).toLocaleString()}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                        <button class="edit-task p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500 dark:text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                        </button>
+                        <button class="delete-task p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500 dark:text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </button>
+                    </div>
+                `;
+
+                container.appendChild(taskElement);
+            });
+        }
+
+        function saveTasks() {
+            localStorage.setItem('tasks', JSON.stringify(tasks));
+        }
+
+        // Add new task
+        document.getElementById('add-task-btn').addEventListener('click', () => {
+            const input = document.getElementById('task-input');
+            const priority = document.getElementById('priority-select').value;
+            
+            if (input.value.trim()) {
+                const newTask = {
+                    id: Date.now(),
+                    text: input.value.trim(),
+                    priority,
+                    completed: false,
+                    createdAt: new Date().toISOString()
+                };
+                
+                tasks.unshift(newTask);
+                saveTasks();
+                renderTasks(document.getElementById('filter-select').value, document.getElementById('sort-select').value);
+                input.value = '';
+            }
+        });
+
+        // Allow Enter key to add task
+        document.getElementById('task-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('add-task-btn').click();
+            }
+        });
+
+        // Handle task interactions
+        document.addEventListener('click', (e) => {
+            const taskElement = e.target.closest('.task-card');
+            if (!taskElement) return;
+            
+            const taskId = parseInt(taskElement.dataset.id);
+            const task = tasks.find(t => t.id === taskId);
+            
+            if (e.target.closest('.complete-toggle')) {
+                task.completed = !task.completed;
+                saveTasks();
+                renderTasks(document.getElementById('filter-select').value, document.getElementById('sort-select').value);
+            }
+            else if (e.target.closest('.edit-task')) {
+                const currentText = task.text;
+                const priority = task.priority;
+                const pElement = taskElement.querySelector('p');
+                
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = currentText;
+                input.className = 'w-full px-2 py-1 rounded border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white';
+                
+                const select = document.createElement('select');
+                select.className = 'mt-2 ml-2 px-2 py-1 rounded border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white';
+                select.innerHTML = `
+                    <option value="low" ${priority === 'low' ? 'selected' : ''}>Low</option>
+                    <option value="medium" ${priority === 'medium' ? 'selected' : ''}>Medium</option>
+                    <option value="high" ${priority === 'high' ? 'selected' : ''}>High</option>
+                `;
+                
+                pElement.replaceWith(input);
+                taskElement.querySelector('.priority-badge').replaceWith(select);
+                input.focus();
+                
+                const saveEdit = () => {
+                    task.text = input.value.trim();
+                    task.priority = select.value;
+                    saveTasks();
+                    renderTasks(document.getElementById('filter-select').value, document.getElementById('sort-select').value);
+                };
+                
+                input.addEventListener('blur', saveEdit);
+                input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') saveEdit();
+                });
+            }
+            else if (e.target.closest('.delete-task')) {
+                tasks = tasks.filter(t => t.id !== taskId);
+                saveTasks();
+                renderTasks(document.getElementById('filter-select').value, document.getElementById('sort-select').value);
+            }
+        });
+
+        // Filter and sort tasks
+        document.getElementById('filter-select').addEventListener('change', (e) => {
+            renderTasks(e.target.value, document.getElementById('sort-select').value);
+        });
+        
+        document.getElementById('sort-select').addEventListener('change', (e) => {
+            renderTasks(document.getElementById('filter-select').value, e.target.value);
+        });
+
+        // Drag and drop functionality
+        let draggedItem = null;
+
+        document.addEventListener('dragstart', (e) => {
+            if (e.target.classList.contains('task-card')) {
+                draggedItem = e.target;
+                e.target.classList.add('dragging');
+            }
+        });
+
+        document.addEventListener('dragend', (e) => {
+            if (e.target.classList.contains('task-card')) {
+                e.target.classList.remove('dragging');
+            }
+        });
+
+        document.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            const afterElement = getDragAfterElement(document.getElementById('tasks-container'), e.clientY);
+            const container = document.getElementById('tasks-container');
+            
+            if (draggedItem) {
+                if (afterElement) {
+                    container.insertBefore(draggedItem, afterElement);
+                } else {
+                    container.appendChild(draggedItem);
+                }
+            }
+        });
+
+        document.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (draggedItem) {
+                // Update task order in the array
+                const newTasks = [];
+                const taskElements = document.querySelectorAll('.task-card');
+                
+                taskElements.forEach(element => {
+                    const taskId = parseInt(element.dataset.id);
+                    const task = tasks.find(t => t.id === taskId);
+                    newTasks.push(task);
+                });
+                
+                tasks = newTasks;
+                saveTasks();
+            }
+        });
+
+        function getDragAfterElement(container, y) {
+            const draggableElements = [...container.querySelectorAll('.task-card:not(.dragging)')];
+            
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+                
+                if (offset < 0 && offset > closest.offset) {
+                    return { offset: offset, element: child };
+                } else {
+                    return closest;
+                }
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+
+        // Double-click to edit
+        document.addEventListener('dblclick', (e) => {
+            if (e.target.closest('.task-card')) {
+                const editBtn = e.target.closest('.task-card').querySelector('.edit-task');
+                if (editBtn) editBtn.click();
+            }
+        });
+
+        // Initialize
+        renderTasks();
+    </script>
+</body>
+</html>
